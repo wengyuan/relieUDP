@@ -1,18 +1,23 @@
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.zip.CRC32;
 
 public class Sender {
 	static int pkt_size = 1000;
-	static int send_interval = 100;
+	static int send_interval = 500;
 	static int time_out = 500;
 	
 	static byte sequenceNum = 0;
 	static byte baseSequence = 0;
 	static byte Acks = 64;
+	static byte tag_fileName = 0;
+	static byte tag_content = 1;
 	
 	static boolean forward = false;
 	static boolean send = true;
+	static boolean completed = false;
 	
 	CRC32 crc = new CRC32();
 
@@ -43,7 +48,26 @@ public class Sender {
 				InetAddress dst_addr = InetAddress.getByName("127.0.0.1");
 				
 				byte[] fileName = outputFileName.getBytes();
-				sendFileName(out_data, dst_addr, fileName);
+				
+				try {
+					sendFileName(out_data, dst_addr, fileName, tag_fileName);
+
+					FileInputStream inputFile = new FileInputStream(directory);
+					byte[] content = new byte[120];
+					int len = 0;
+					while ((len = inputFile.read(content)) != -1) {
+						forward = false;
+						send = true;
+						sendFileName(out_data, dst_addr, content, tag_content);
+					}
+					inputFile.close();
+					completed = true;
+				} catch (Exception e) {
+					e.printStackTrace();
+				} finally {
+					sk_out.close();
+				}
+				
 				
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -54,43 +78,37 @@ public class Sender {
 		
 
 		public void sendFileName(byte[] out_data, InetAddress dst_addr,
-				byte[] fileName) {
-				packaging(out_data, fileName, fileName.length);
+				byte[] fileName, int tag) throws IOException {
+				out_data = packaging(fileName, fileName.length, tag);
 				
-				try {
 					// send the packet
 					int count = 0;
 					while(!forward) {
 						while(!send) {
 						}
-							System.out.println("send: " + (++count));
 							send = false;
 							DatagramPacket out_pkt = new DatagramPacket(out_data,
 									out_data.length, dst_addr, dst_port);
 							sk_out.send(out_pkt);
-							System.out.println(sequenceNum);
-							System.out.println(Acks);
 					}
 					
 					System.out.println("out: " +  "currentCount: " + count);
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					sk_out.close();
-				}
 		}
 
-		private void packaging(byte[] out_data, byte[] content, int contentLength) {
+		private byte[] packaging(byte[] content, int contentLength, int tag) {
+			byte[] out_data = new byte[pkt_size];
 			sequenceNum = (byte) ((++sequenceNum)%128);
 			Acks = (byte) ((++Acks)%128);
-			byte[] checkSumContent = new byte[contentLength+3];
+			byte[] checkSumContent = new byte[contentLength+4];
 			
 			checkSumContent[0] = sequenceNum;
 			checkSumContent[1] = Acks;
-			checkSumContent[2] = (byte) contentLength;
-			
-			for(int i = 3; i < checkSumContent.length; i++) {
-				checkSumContent[i] = content[i-3];
+			checkSumContent[3] = (byte) contentLength;
+			checkSumContent[4] = (byte) tag;
+ 			
+			System.out.println("tag: " + tag);
+			for(int i = 4; i < checkSumContent.length; i++) {
+				checkSumContent[i] = content[i-4];
 			}
 			
 			crc.reset();
@@ -106,6 +124,8 @@ public class Sender {
 			for(int i = checkSumByte.length+1; i < checkSumByte.length + checkSumContent.length + 1; i++) {
 				out_data[i] = checkSumContent[i-checkSumByte.length-1];
 			}
+			
+			return out_data;
 	
 		}
 	}
@@ -125,7 +145,7 @@ public class Sender {
 						in_data.length);
 				
 				try {
-					while(!forward) {
+					while(!completed) {
 						byte[] checkSum = null;
 						byte[] Ack = null;
 						long check_sum = 0;

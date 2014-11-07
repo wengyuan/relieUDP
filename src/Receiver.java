@@ -16,7 +16,16 @@ public class Receiver {
 		DatagramSocket sk2, sk3;
 		System.out.println("sk2_dst_port=" + sk2_dst_port + ", "
 				+ "sk3_dst_port=" + sk3_dst_port + ".");
+		
+		//create the directory if it is not existed
+		File file = new File(directory);
+		if (!file.exists()) {
+			file.mkdir();
+		}
 
+		//create file output stream
+		FileOutputStream outputFile = null;
+		
 		// create sockets
 		try {
 			sk2 = new DatagramSocket(sk2_dst_port);
@@ -33,6 +42,7 @@ public class Receiver {
 				while(true) {
 					byte sequence = 0;
 					byte acks = 0;
+					byte tag = 0;
 					boolean corrupt = false;
 					
 						try {
@@ -48,27 +58,31 @@ public class Receiver {
 						crc.reset();
 						sequence = in_data[in_data[0]+1];
 						acks = in_data[in_data[0]+2];
-						int fileLength = in_data[in_data[0]+3];
-						byte[] content = new byte[fileLength+3];
-						byte[] nameContent = new byte[fileLength];
-						for(int i = in_data[0]+1; i< in_data[0]+ 4 + fileLength; i++) {
-							content[i - in_data[0]- 1] = in_data[i];
-							if(i >= in_data[0] + 4 && i < in_data[0]+ 4 + fileLength) {
-								nameContent[i - in_data[0]- 4] = in_data[i];
+						tag = in_data[in_data[0]+3];
+
+						System.out.println(sequence + " " + acks + " " + in_data[in_data[0]+3]);
+						
+						int fileLength = in_data[in_data[0]+4];
+						byte[] checkSumcontent = new byte[fileLength+4];
+						byte[] content = new byte[fileLength];
+						for(int i = in_data[0]+1; i< in_data[0]+ 5 + fileLength; i++) {
+							checkSumcontent[i - in_data[0]- 1] = in_data[i];
+							if(i >= in_data[0] + 5 && i < in_data[0]+ 5 + fileLength) {
+								content[i - in_data[0]- 5] = in_data[i];
 							}
 						}
-						crc.update(content);
+						crc.update(checkSumcontent);
 						
 
-						long check = crc.getValue();
-						byte[] checks = Long.toString(check).getBytes();
+						long check_sum = crc.getValue();
+						byte[] checkSum = Long.toString(check_sum).getBytes();
 						
 						int checkSumLength = in_data[0];
-						if(checkSumLength != checks.length) {
+						if(checkSumLength != checkSum.length) {
 							corrupt = true;
 						} else {
 							for (int i = 1; i <= checkSumLength; i++) {
-								if (checks[i - 1] != in_data[i]) {
+								if (checkSum[i - 1] != in_data[i]) {
 									corrupt = true;
 								}
 							}
@@ -76,13 +90,23 @@ public class Receiver {
 						
 						if(!corrupt && last_receive == sequence) {
 							sk3.send(last_packet);
+							System.out.println("resend");
 							continue;
 						}
 						
 						if(!corrupt) {
 							last_receive = sequence;
-							fileName = new String(nameContent);
-							System.out.println(fileName);
+							if(tag == 0) {
+								System.out.println("name");
+								fileName = new String(content);
+								outputFile = new FileOutputStream(directory + "/" + fileName);
+							}
+							if(tag == 1) {
+
+								System.out.println("content");
+								outputFile.write(content);
+							}
+							
 							sendAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						} else {
@@ -91,15 +115,6 @@ public class Receiver {
 						}
 				
 				}
-				
-				//create the directory if it is not existe
-				File file = new File(directory);
-				if (!file.exists()) {
-					file.mkdir();
-				}
-				
-				//create file output stream
-				FileOutputStream outputFile = new FileOutputStream(directory + "\\" + fileName);
 							
 				outputFile.write(in_data);
 				
@@ -184,7 +199,6 @@ public class Receiver {
 
 		crc.update(Ack, 0, 2);
 		long check_sum = crc.getValue();
-		System.out.println(check_sum);
 		byte[] checkSumByte = Long.toString(check_sum).getBytes();
 		out_data[0] = (byte) checkSumByte.length;
 		for (int i = 1; i <= checkSumByte.length; i++) {
@@ -225,6 +239,7 @@ public class Receiver {
 		DatagramPacket out_pkt = new DatagramPacket(out_data,
 				in_data.length, dst_addr, sk3_dst_port);
 		sk3.send(out_pkt);
+
 		System.out.println("sent corrupted data");
 	}
 
