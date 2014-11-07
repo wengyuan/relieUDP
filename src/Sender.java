@@ -4,7 +4,7 @@ import java.util.zip.CRC32;
 
 public class Sender {
 	static int pkt_size = 1000;
-	static int send_interval = 500;
+	static int send_interval = 100;
 	static int time_out = 500;
 	
 	static byte sequenceNum = 0;

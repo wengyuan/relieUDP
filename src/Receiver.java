@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
@@ -7,10 +8,11 @@ import java.util.zip.CRC32;
 public class Receiver {
 	static int pkt_size = 512;
 	static int last_receive = 0;
+	static int time_out = 10000;
 	DatagramPacket last_packet = null;
 	CRC32 crc = new CRC32();
 
-	public Receiver(int sk2_dst_port, int sk3_dst_port) {
+	public Receiver(int sk2_dst_port, int sk3_dst_port, String directory) {
 		DatagramSocket sk2, sk3;
 		System.out.println("sk2_dst_port=" + sk2_dst_port + ", "
 				+ "sk3_dst_port=" + sk3_dst_port + ".");
@@ -33,7 +35,16 @@ public class Receiver {
 					byte acks = 0;
 					boolean corrupt = false;
 					
-						sk2.receive(in_pkt);
+						try {
+							sk2.setSoTimeout(time_out);
+							sk2.receive(in_pkt);
+						} catch(SocketTimeoutException e) {
+							if(fileName == null) {
+								continue;
+							} else {
+								break;
+							}
+						}
 						crc.reset();
 						sequence = in_data[in_data[0]+1];
 						acks = in_data[in_data[0]+2];
@@ -80,6 +91,20 @@ public class Receiver {
 						}
 				
 				}
+				
+				//create the directory if it is not existe
+				File file = new File(directory);
+				if (!file.exists()) {
+					file.mkdir();
+				}
+				
+				//create file output stream
+				FileOutputStream outputFile = new FileOutputStream(directory + "\\" + fileName);
+							
+				outputFile.write(in_data);
+				
+				outputFile.close();
+				
 				
 				/*
 				while (true) {
@@ -205,12 +230,12 @@ public class Receiver {
 
 	public static void main(String[] args) {
 		// parse parameters
-		if (args.length != 2) {
+		if (args.length != 3) {
+			System.out.println(args.length);
 			System.err
-					.println("Usage: java TestReceiver sk2_dst_port, sk3_dst_port");
+					.println("Usage: java TestSender sk1_dst_port, sk4_dst_port");
 			System.exit(-1);
 		} else
-			new Receiver(Integer.parseInt(args[0]),
-					Integer.parseInt(args[1]));
+			new Receiver(Integer.parseInt(args[0]), Integer.parseInt(args[1]), args[2]);
 	}
 }
