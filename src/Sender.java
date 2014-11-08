@@ -7,7 +7,7 @@ import java.util.zip.CRC32;
 
 public class Sender {
 	static int pkt_size = 1000;
-	static int time_out = 100;
+	static int time_out = 500;
 	
 	static byte sequenceNum = 0;
 	static byte baseSequence = 0;
@@ -111,12 +111,11 @@ public class Sender {
 			checkSumContent[1] = Acks;
 			checkSumContent[2] = (byte) tag;
 			checkSumContent[3] = (byte) contentLengthByteLength;
-			System.out.println((byte) contentLengthByteLength);
 			for(int i = 4; i < contentLengthByteLength+4; i++) {
 				checkSumContent[i] = contentLengthByte[i-4];
 			}
  			
-			System.out.println(checkSumContent[0] +  " " + checkSumContent[1] + " " + checkSumContent[2] + " " + checkSumContent[3] + " "+ checkSumContent[4] + " " + checkSumContent[5] + " "+ checkSumContent[6]);
+			System.out.println(sequenceNum +  " " + Acks + " " + tag + " " + checkSumContent[4] + " " + checkSumContent[5] + " "+ checkSumContent[6]);
 			for(int i = contentLengthByteLength+4; i < checkSumContent.length; i++) {
 				checkSumContent[i] = content[i-contentLengthByteLength-4];
 			}
