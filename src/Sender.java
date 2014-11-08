@@ -6,7 +6,6 @@ import java.util.zip.CRC32;
 
 public class Sender {
 	static int pkt_size = 1000;
-	static int send_interval = 500;
 	static int time_out = 500;
 	
 	static byte sequenceNum = 0;
@@ -50,15 +49,18 @@ public class Sender {
 				byte[] fileName = outputFileName.getBytes();
 				
 				try {
-					sendFileName(out_data, dst_addr, fileName, tag_fileName);
+					//start sending file name over to receiver
+					sendFileName(out_data, dst_addr, fileName, fileName.length, tag_fileName);
 
 					FileInputStream inputFile = new FileInputStream(directory);
 					byte[] content = new byte[120];
 					int len = 0;
+					//start sending file content to receiver
 					while ((len = inputFile.read(content)) != -1) {
+						out_data = new byte[pkt_size];
 						forward = false;
 						send = true;
-						sendFileName(out_data, dst_addr, content, tag_content);
+						sendFileName(out_data, dst_addr, content, len, tag_content);
 					}
 					inputFile.close();
 					completed = true;
@@ -78,8 +80,8 @@ public class Sender {
 		
 
 		public void sendFileName(byte[] out_data, InetAddress dst_addr,
-				byte[] fileName, int tag) throws IOException {
-				out_data = packaging(fileName, fileName.length, tag);
+				byte[] content, int length, int tag) throws IOException {
+				out_data = packaging(out_data, content, length, tag);
 				
 					// send the packet
 					int count = 0;
@@ -95,18 +97,17 @@ public class Sender {
 					System.out.println("out: " +  "currentCount: " + count);
 		}
 
-		private byte[] packaging(byte[] content, int contentLength, int tag) {
-			byte[] out_data = new byte[pkt_size];
+		private byte[] packaging(byte[] out_data, byte[] content, int contentLength, int tag) {
 			sequenceNum = (byte) ((++sequenceNum)%128);
 			Acks = (byte) ((++Acks)%128);
 			byte[] checkSumContent = new byte[contentLength+4];
 			
 			checkSumContent[0] = sequenceNum;
 			checkSumContent[1] = Acks;
+			checkSumContent[2] = (byte) tag;
 			checkSumContent[3] = (byte) contentLength;
-			checkSumContent[4] = (byte) tag;
  			
-			System.out.println("tag: " + tag);
+			System.out.println(sequenceNum +  " " + Acks + " " + tag);
 			for(int i = 4; i < checkSumContent.length; i++) {
 				checkSumContent[i] = content[i-4];
 			}
@@ -124,7 +125,7 @@ public class Sender {
 			for(int i = checkSumByte.length+1; i < checkSumByte.length + checkSumContent.length + 1; i++) {
 				out_data[i] = checkSumContent[i-checkSumByte.length-1];
 			}
-			
+			System.out.println(out_data[checkSumByte.length+1] +  " " + out_data[checkSumByte.length+2] + " " + out_data[checkSumByte.length+3]);
 			return out_data;
 	
 		}
@@ -186,7 +187,7 @@ public class Sender {
 						if (!corrupt) {
 							forward = true;
 							send = true;
-							baseSequence++;
+							baseSequence = (byte) ((++baseSequence)%128);
 							System.out.println("not cor");
 						} else {
 							send = true;

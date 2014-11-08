@@ -43,8 +43,9 @@ public class Receiver {
 					byte sequence = 0;
 					byte acks = 0;
 					byte tag = 0;
+					int contentLength = 0;
 					boolean corrupt = false;
-					
+						try {
 						try {
 							sk2.setSoTimeout(time_out);
 							sk2.receive(in_pkt);
@@ -59,15 +60,16 @@ public class Receiver {
 						sequence = in_data[in_data[0]+1];
 						acks = in_data[in_data[0]+2];
 						tag = in_data[in_data[0]+3];
-
+						contentLength = in_data[in_data[0]+4];
+						
 						System.out.println(sequence + " " + acks + " " + in_data[in_data[0]+3]);
 						
-						int fileLength = in_data[in_data[0]+4];
-						byte[] checkSumcontent = new byte[fileLength+4];
-						byte[] content = new byte[fileLength];
-						for(int i = in_data[0]+1; i< in_data[0]+ 5 + fileLength; i++) {
+
+						byte[] checkSumcontent = new byte[contentLength+4];
+						byte[] content = new byte[contentLength];
+						for(int i = in_data[0]+1; i< in_data[0]+ 5 + contentLength; i++) {
 							checkSumcontent[i - in_data[0]- 1] = in_data[i];
-							if(i >= in_data[0] + 5 && i < in_data[0]+ 5 + fileLength) {
+							if(i >= in_data[0] + 5 && i < in_data[0]+ 5 + contentLength) {
 								content[i - in_data[0]- 5] = in_data[i];
 							}
 						}
@@ -97,19 +99,22 @@ public class Receiver {
 						if(!corrupt) {
 							last_receive = sequence;
 							if(tag == 0) {
-								System.out.println("name");
 								fileName = new String(content);
-								outputFile = new FileOutputStream(directory + "/" + fileName);
+								outputFile = new FileOutputStream(directory + fileName);
 							}
 							if(tag == 1) {
 
 								System.out.println("content");
-								outputFile.write(content);
+								outputFile.write(content, 0, contentLength);
 							}
 							
 							sendAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						} else {
+							sendCorruptAck(sk3_dst_port, sk3, in_data,
+									dst_addr, sequence, acks);
+						}
+						} catch(Exception e) {
 							sendCorruptAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						}
