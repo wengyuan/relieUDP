@@ -96,7 +96,7 @@ public class Receiver {
 							continue;
 						}
 						
-						if(!corrupt) {
+						if(!corrupt && last_receive == sequence-1) {
 							last_receive = sequence;
 							if(tag == 0) {
 								fileName = new String(content);
