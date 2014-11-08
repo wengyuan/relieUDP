@@ -120,8 +120,6 @@ public class Receiver {
 						}
 				
 				}
-							
-				outputFile.write(in_data);
 				
 				outputFile.close();
 				
