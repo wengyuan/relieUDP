@@ -1,4 +1,5 @@
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
@@ -6,7 +7,7 @@ import java.util.zip.CRC32;
 
 public class Sender {
 	static int pkt_size = 1000;
-	static int time_out = 500;
+	static int time_out = 100;
 	
 	static byte sequenceNum = 0;
 	static byte baseSequence = 0;
@@ -17,6 +18,8 @@ public class Sender {
 	static boolean forward = false;
 	static boolean send = true;
 	static boolean completed = false;
+	
+	static int count = 0;
 	
 	CRC32 crc = new CRC32();
 
@@ -53,7 +56,7 @@ public class Sender {
 					sendFileName(out_data, dst_addr, fileName, fileName.length, tag_fileName);
 
 					FileInputStream inputFile = new FileInputStream(directory);
-					byte[] content = new byte[120];
+					byte[] content = new byte[800];
 					int len = 0;
 					//start sending file content to receiver
 					while ((len = inputFile.read(content)) != -1) {
@@ -100,16 +103,22 @@ public class Sender {
 		private byte[] packaging(byte[] out_data, byte[] content, int contentLength, int tag) {
 			sequenceNum = (byte) ((++sequenceNum)%128);
 			Acks = (byte) ((++Acks)%128);
-			byte[] checkSumContent = new byte[contentLength+4];
+			byte[] contentLengthByte = Integer.toString(contentLength).getBytes();
+			int contentLengthByteLength = contentLengthByte.length;
+			byte[] checkSumContent = new byte[contentLength+4+contentLengthByteLength];
 			
 			checkSumContent[0] = sequenceNum;
 			checkSumContent[1] = Acks;
 			checkSumContent[2] = (byte) tag;
-			checkSumContent[3] = (byte) contentLength;
+			checkSumContent[3] = (byte) contentLengthByteLength;
+			System.out.println((byte) contentLengthByteLength);
+			for(int i = 4; i < contentLengthByteLength+4; i++) {
+				checkSumContent[i] = contentLengthByte[i-4];
+			}
  			
-			System.out.println(sequenceNum +  " " + Acks + " " + tag);
-			for(int i = 4; i < checkSumContent.length; i++) {
-				checkSumContent[i] = content[i-4];
+			System.out.println(checkSumContent[0] +  " " + checkSumContent[1] + " " + checkSumContent[2] + " " + checkSumContent[3] + " "+ checkSumContent[4] + " " + checkSumContent[5] + " "+ checkSumContent[6]);
+			for(int i = contentLengthByteLength+4; i < checkSumContent.length; i++) {
+				checkSumContent[i] = content[i-contentLengthByteLength-4];
 			}
 			
 			crc.reset();
@@ -125,7 +134,6 @@ public class Sender {
 			for(int i = checkSumByte.length+1; i < checkSumByte.length + checkSumContent.length + 1; i++) {
 				out_data[i] = checkSumContent[i-checkSumByte.length-1];
 			}
-			System.out.println(out_data[checkSumByte.length+1] +  " " + out_data[checkSumByte.length+2] + " " + out_data[checkSumByte.length+3]);
 			return out_data;
 	
 		}

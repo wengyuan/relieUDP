@@ -6,9 +6,9 @@ import java.util.*;
 import java.util.zip.CRC32;
 
 public class Receiver {
-	static int pkt_size = 512;
+	static int pkt_size = 1000;
 	static int last_receive = 0;
-	static int time_out = 10000;
+	static int time_out = 2000;
 	DatagramPacket last_packet = null;
 	CRC32 crc = new CRC32();
 
@@ -38,12 +38,12 @@ public class Receiver {
 				InetAddress dst_addr = InetAddress.getByName("127.0.0.1");
 				
 				String fileName = null;
-
+				int count = 0;
 				while(true) {
 					byte sequence = 0;
 					byte acks = 0;
 					byte tag = 0;
-					int contentLength = 0;
+					int contentLengthByteLength = 0;
 					boolean corrupt = false;
 						try {
 						try {
@@ -60,17 +60,23 @@ public class Receiver {
 						sequence = in_data[in_data[0]+1];
 						acks = in_data[in_data[0]+2];
 						tag = in_data[in_data[0]+3];
-						contentLength = in_data[in_data[0]+4];
-						
-						System.out.println(sequence + " " + acks + " " + in_data[in_data[0]+3]);
-						
+						contentLengthByteLength = in_data[in_data[0]+4];
+						byte[] contentLengthByte = new byte[contentLengthByteLength];
+						for(int i = 0; i < contentLengthByteLength; i++) {
+							contentLengthByte[i] = in_data[i+in_data[0]+5];
+						}
+						int contentLength = Integer.parseInt(new String(contentLengthByte));
 
-						byte[] checkSumcontent = new byte[contentLength+4];
+						System.out.println(in_data[in_data[0]+1]+ "***" + in_data[in_data[0]+2]+ 
+								"***"+in_data[in_data[0]+3]+"***"+in_data[in_data[0]+4]+"***"+
+								contentLength);
+						
+						byte[] checkSumcontent = new byte[contentLength+contentLengthByteLength+4];
 						byte[] content = new byte[contentLength];
-						for(int i = in_data[0]+1; i< in_data[0]+ 5 + contentLength; i++) {
+						for(int i = in_data[0]+1; i< in_data[0]+contentLength+contentLengthByteLength+5; i++) {
 							checkSumcontent[i - in_data[0]- 1] = in_data[i];
-							if(i >= in_data[0] + 5 && i < in_data[0]+ 5 + contentLength) {
-								content[i - in_data[0]- 5] = in_data[i];
+							if(i >= in_data[0] + contentLengthByteLength + 5) {
+								content[i - in_data[0] - contentLengthByteLength - 5] = in_data[i];
 							}
 						}
 						crc.update(checkSumcontent);
@@ -97,7 +103,7 @@ public class Receiver {
 						}
 						
 						if(!corrupt && last_receive == sequence-1) {
-							last_receive = sequence;
+							last_receive++;
 							if(tag == 0) {
 								fileName = new String(content);
 								outputFile = new FileOutputStream(directory + fileName);
@@ -111,6 +117,7 @@ public class Receiver {
 							sendAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						} else {
+							System.out.println("else cor");
 							sendCorruptAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						}
