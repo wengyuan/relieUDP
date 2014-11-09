@@ -129,60 +129,6 @@ public class Receiver {
 				}
 				
 				outputFile.close();
-				
-				
-				/*
-				while (true) {
-					// receive packet
-					
-					sk2.receive(in_pkt);
-					crc.reset();
-					byte[] checkSum = new byte[in_data[0]];
-					for(int i = 1; i <= in_data[0]; i++) {
-						checkSum[i-1] = in_data[i];
-					}
-					
-					byte sequence = in_data[in_data[0]+1];
-					byte acks = in_data[in_data[0]+2];
-					byte fileLength = in_data[in_data[0]+3];
-					byte[] content = new byte[fileLength];
-					for(int i = in_data[0]+4; i< in_data[0]+4 + fileLength; i++) {
-						content[i - in_data[0]- 4] = in_data[i];
-					}
-					crc.update(content);
-
-					if(crc.getValue() == Long.parseLong(new String(checkSum))) {
-						output.write(content, 0, fileLength);
-					} else {
-						System.out.println("cor");
-					}
-					
-					// send received packet
-					crc.reset();
-					byte[] out_data = new byte[pkt_size];
-					byte[] Ack = new byte[2];
-					Ack[0] = (byte) (sequence%128);
-					Ack[1] = (byte) (acks%128);
-
-					System.out.println("sequence: " + Ack[0]);
-					System.out.println("Ack: " + Ack[1]);
-					crc.update(Ack, 0, 2);
-					long check_sum = crc.getValue();
-					System.out.println(check_sum);
-					byte[] checkSumByte = Long.toString(check_sum).getBytes();
-					out_data[0] = (byte) checkSumByte.length;
-					for(int i = 1; i <= checkSumByte.length; i++) {
-						out_data[i] = checkSumByte[i-1];
-					}
-					out_data[checkSumByte.length+1] = sequence;
-					out_data[checkSumByte.length+2] = acks;
-					
-					DatagramPacket out_pkt = new DatagramPacket(out_data,
-							in_data.length, dst_addr, sk3_dst_port);
-					sk3.send(out_pkt);
-
-				}
-				*/
 			} catch (Exception e) {
 				e.printStackTrace();
 				System.exit(-1);
