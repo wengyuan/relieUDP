@@ -38,7 +38,6 @@ public class Receiver {
 				InetAddress dst_addr = InetAddress.getByName("127.0.0.1");
 				
 				String fileName = null;
-				int count = 0;
 				while(true) {
 					byte sequence = 0;
 					byte acks = 0;
@@ -62,23 +61,15 @@ public class Receiver {
 						tag = in_data[in_data[0]+3];
 						contentLengthByteLength = in_data[in_data[0]+4];
 						byte[] contentLengthByte = new byte[contentLengthByteLength];
-						for(int i = 0; i < contentLengthByteLength; i++) {
-							contentLengthByte[i] = in_data[i+in_data[0]+5];
-						}
+						System.arraycopy(in_data, in_data[0]+5, contentLengthByte, 0, contentLengthByteLength);
+						
 						int contentLength = Integer.parseInt(new String(contentLengthByte));
-
-						System.out.println(in_data[in_data[0]+1]+ "***" + in_data[in_data[0]+2]+ 
-								"***"+in_data[in_data[0]+3]+"***"+in_data[in_data[0]+4]+"***"+
-								contentLength);
 						
 						byte[] checkSumcontent = new byte[contentLength+contentLengthByteLength+4];
 						byte[] content = new byte[contentLength];
-						for(int i = in_data[0]+1; i< in_data[0]+contentLength+contentLengthByteLength+5; i++) {
-							checkSumcontent[i - in_data[0]- 1] = in_data[i];
-							if(i >= in_data[0] + contentLengthByteLength + 5) {
-								content[i - in_data[0] - contentLengthByteLength - 5] = in_data[i];
-							}
-						}
+
+						System.arraycopy(in_data, in_data[0]+1, checkSumcontent, 0, contentLength+contentLengthByteLength+4);
+						System.arraycopy(in_data, in_data[0]+contentLengthByteLength+5, content, 0, contentLength);
 						crc.update(checkSumcontent);
 						
 
@@ -98,26 +89,22 @@ public class Receiver {
 						
 						if(!corrupt && last_receive == sequence) {
 							sk3.send(last_packet);
-							System.out.println("resend");
 							continue;
 						}
 						
-						if(!corrupt && last_receive == sequence-1) {
-							last_receive++;
+						if(!corrupt && (last_receive+1)%128 == sequence) {
+							last_receive = (last_receive+1)%128;
 							if(tag == 0) {
 								fileName = new String(content);
 								outputFile = new FileOutputStream(directory + fileName);
 							}
 							if(tag == 1) {
-
-								System.out.println("content");
 								outputFile.write(content, 0, contentLength);
 							}
 							
 							sendAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						} else {
-							System.out.println("else cor");
 							sendCorruptAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
 						}
@@ -127,8 +114,6 @@ public class Receiver {
 						}
 				
 				}
-				
-				outputFile.close();
 			} catch (Exception e) {
 				e.printStackTrace();
 				System.exit(-1);
@@ -148,20 +133,15 @@ public class Receiver {
 		crc.reset();
 		byte[] out_data = new byte[pkt_size];
 		byte[] Ack = new byte[2];
-		Ack[0] = (byte) (sequence % 128);
-		Ack[1] = (byte) (acks % 128);
-		System.out.println(Ack[0]);
-		System.out.println(Ack[1]);
+		Ack[0] = sequence;
+		Ack[1] = acks;
 
 		crc.update(Ack, 0, 2);
 		long check_sum = crc.getValue();
+		
 		byte[] checkSumByte = Long.toString(check_sum).getBytes();
 		out_data[0] = (byte) checkSumByte.length;
-		for (int i = 1; i <= checkSumByte.length; i++) {
-			out_data[i] = checkSumByte[i - 1];
-		}
-		out_data[checkSumByte.length + 1] = sequence;
-		out_data[checkSumByte.length + 2] = acks;
+		System.arraycopy(checkSumByte, 0, out_data, 1, checkSumByte.length);
 
 		DatagramPacket out_pkt = new DatagramPacket(out_data,
 				in_data.length, dst_addr, sk3_dst_port);
@@ -169,12 +149,11 @@ public class Receiver {
 		sk3.send(out_pkt);
 		
 	}
-
+ 
 	private void sendCorruptAck(int sk3_dst_port, DatagramSocket sk3,
 			byte[] in_data, InetAddress dst_addr, byte sequence, byte acks)
 			throws IOException {
 		// send corrupted ack
-		System.out.println("corrupted");
 		crc.reset();
 		byte[] out_data = new byte[pkt_size];
 		byte[] Ack = new byte[2];
@@ -183,20 +162,13 @@ public class Receiver {
 
 		crc.update(Ack, 0, 2);
 		long check_sum = crc.getValue();
-		System.out.println(check_sum);
 		byte[] checkSumByte = Long.toString(check_sum).getBytes();
 		out_data[0] = (byte) checkSumByte.length;
-		for (int i = 1; i <= checkSumByte.length; i++) {
-			out_data[i] = checkSumByte[i - 1];
-		}
-		out_data[checkSumByte.length + 1] = sequence;
-		out_data[checkSumByte.length + 2] = acks;
+		System.arraycopy(checkSumByte, 0, out_data, 1, checkSumByte.length);
 
 		DatagramPacket out_pkt = new DatagramPacket(out_data,
 				in_data.length, dst_addr, sk3_dst_port);
 		sk3.send(out_pkt);
-
-		System.out.println("sent corrupted data");
 	}
 
 	public static void main(String[] args) {
