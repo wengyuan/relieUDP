@@ -8,7 +8,7 @@ import java.util.zip.CRC32;
 public class Receiver {
 	static int pkt_size = 1000;
 	static int last_receive = 0;
-	static int time_out = 1000;
+	static int time_out = 2000;
 	DatagramPacket last_packet = null;
 	CRC32 crc = new CRC32();
 
@@ -96,8 +96,14 @@ public class Receiver {
 							}
 						}
 						
-						if(!corrupt && (last_receive+1)%128 == sequence) {
-							last_receive = (last_receive+1)%128;
+						if(!corrupt && last_receive == sequence) {
+							sk3.send(last_packet);
+							System.out.println("resend");
+							continue;
+						}
+						
+						if(!corrupt && last_receive == sequence-1) {
+							last_receive++;
 							if(tag == 0) {
 								fileName = new String(content);
 								outputFile = new FileOutputStream(directory + fileName);
@@ -110,10 +116,6 @@ public class Receiver {
 							
 							sendAck(sk3_dst_port, sk3, in_data,
 									dst_addr, sequence, acks);
-						} else if(!corrupt) {
-							sendAck(sk3_dst_port, sk3, in_data,
-									dst_addr, sequence, acks);
-							
 						} else {
 							System.out.println("else cor");
 							sendCorruptAck(sk3_dst_port, sk3, in_data,
@@ -197,8 +199,6 @@ public class Receiver {
 	private void sendAck(int sk3_dst_port, DatagramSocket sk3, byte[] in_data,
 			InetAddress dst_addr, byte sequence, byte acks) throws IOException {
 		// send received Ack
-
-		System.out.println("send ack");
 		crc.reset();
 		byte[] out_data = new byte[pkt_size];
 		byte[] Ack = new byte[2];
